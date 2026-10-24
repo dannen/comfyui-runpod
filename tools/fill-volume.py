@@ -15,7 +15,8 @@ It tries cheap CPU pods first (GraphQL deployCpuPod), then GPU pods (REST), and
 retries while the datacenter has no supply. It follows the pod's log (port 8000,
 through RunPod's proxy) and always deletes the pod at the end: on success,
 failure, timeout or Ctrl-C. Every file with a SHA-256 in models.txt is checked
-on the volume. Exit status 0 = the job succeeded.
+on the volume (or, with --sha256 FILE, the files in that sha256sum-style list,
+paths relative to models/). Exit status 0 = the job succeeded.
 
 R2 credentials: R2_ENV_FILE_RO (fetch, read-only token) and R2_ENV_FILE (push,
 read-write) from project.conf, files of R2_ACCOUNT_ID=, R2_ACCESS_KEY_ID=,
@@ -138,6 +139,8 @@ def main():
     mode.add_argument("--push", action="store_true", help="volume -> R2 instead")
     mode.add_argument("--check", action="store_true", help="only check the SHA-256s")
     p.add_argument("--manifest", default=str(rp.ROOT / "models.txt"))
+    p.add_argument("--sha256", help="check this sha256sum-style list (paths relative to models/) "
+                                    "instead of models.txt's SHA-256s")
     p.add_argument("--flags", help="extra rclone flags (FETCH_FLAGS), e.g. --flags='--max-size 1G' (with =)")
     p.add_argument("--cpu", default=CPUS, help="CPU instance ids to try, in order")
     p.add_argument("--gpu", default=GPUS, help="GPU types to fall back to, in order ('' = CPU only)")
@@ -165,7 +168,10 @@ def main():
         env["HF_TOKEN"] = os.environ["HF_TOKEN"]
     if a.flags:
         env["FETCH_FLAGS"] = a.flags
-    script = build_script(*manifest_and_sums(a.manifest))
+    manifest, sums = manifest_and_sums(a.manifest)
+    if a.sha256:
+        sums = Path(a.sha256).read_text()
+    script = build_script(manifest, sums)
     name = f"{rp.conf('PROJECT', 'comfyui')}-volume-{job}"
 
     pod = desc = None
