@@ -66,9 +66,12 @@ until they're deleted.
 
 ## Order of work
 
-1. Copy the baseline and `git init`. Edit `project.conf` with the person's
+1. `tools/new-project.sh <example> DEST` (or `--empty`) and `git init`. If an
+   example in `examples/` fits, start from it and read its README. Edit `project.conf` with the person's
    names, image, datacenters and GPUs. Have them create the `AUTH_FILE`.
-2. List the models in `models.txt`, then run `tools/hf-sha256.py --write`. Add
+2. List the models in `models.txt`: `tools/template-models.py` turns official
+   templates or the person's workflow file into `models.txt` and
+   `custom_nodes.txt` lines; otherwise write them and run `tools/hf-sha256.py --write`. Add
    custom nodes to `custom_nodes.txt` only if the workflows need them, each one
    pinned to a full commit. Read a pack before adding it: it runs with the
    pod's files and keys.

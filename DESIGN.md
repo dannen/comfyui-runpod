@@ -59,6 +59,12 @@ where most debugging should happen.
 - **The build fails on a broken node pack:** `main.py --cpu --quick-test-for-ci`
   runs at build time, and any `IMPORT FAILED` stops it. ComfyUI itself only logs
   a warning and carries on, which turns into "missing node type" in the browser.
+- **Node packs often need system libraries** the CUDA runtime base image lacks:
+  OpenCV (`cv2`, used by many packs) fails with `libxcb.so.1: cannot open shared
+  object file`. The Dockerfile installs libGL/libxcb and friends before the packs.
+- **Check workflows against the running ComfyUI:** `tools/comfy.py check
+  workflows/*.json` lists node types that aren't registered, before anyone opens
+  the workflow and gets "missing node type".
 - **Custom nodes are baked in, not installed onto the volume.** Nodes on a volume
   drift (manager updates, half-finished installs) and tie the volume to one
   ComfyUI version. Baked in, a rebuild is the only way they change, and the
@@ -306,11 +312,12 @@ What a working endpoint needed, for when one is added:
 
 ## 12. New project checklist
 
-1. Copy this folder; `git init`; edit `project.conf` (names, image, datacenters,
+1. `tools/new-project.sh <example>|--empty DEST`; `git init`; edit `project.conf` (names, image, datacenters,
    GPUs, auth file) and create the auth file (`umask 077; echo 'user:pass' > …`).
 2. Find the models: official ComfyUI templates
-   (github.com/Comfy-Org/workflow_templates) name their files and folders. List
-   them in `models.txt`; `tools/hf-sha256.py --write`.
+   (github.com/Comfy-Org/workflow_templates) name their files, folders and
+   custom nodes; `tools/template-models.py <template> --write .` turns them into
+   `models.txt` and `custom_nodes.txt` (or start from `examples/`).
 3. Pin custom nodes in `custom_nodes.txt` only if the workflows need them.
 4. Put UI workflows in `workflows/`, API exports in `api/`.
 5. `./build.sh --cu128 --cache`, `./run-local.sh` (or `--cpu`), test with

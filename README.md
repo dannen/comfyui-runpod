@@ -19,8 +19,12 @@ What you get:
   - `gpus.py`: GPU stock by datacenter, ranked by price per GB of VRAM; `--cheapest` for the
     cheapest in-stock GPUs anywhere (secure, community and spot prices).
   - `comfy.py`: run an API-format workflow on the pod or locally, upload inputs,
-    download results without overwriting.
+    download results without overwriting; `check` lists node types a workflow
+    uses that the running ComfyUI doesn't have.
   - `hf-sha256.py`: fill `models.txt`'s SHA-256 column from Hugging Face.
+  - `template-models.py`: `models.txt` and `custom_nodes.txt` lines from official ComfyUI
+    templates (or any workflow file), with sizes, SHA-256s and pinned node commits.
+  - `new-project.sh`: a new project folder from the baseline, optionally from an example.
   - `fill-volume.py`: fill a volume from inside its datacenter with a throwaway pod (from the
     `models.txt` URLs or R2), check the SHA-256s, delete the pod.
   - `populate-volume.sh`: seed a volume from your machine through the S3 gateway (small files).
@@ -41,16 +45,29 @@ custom_nodes.txt    third-party nodes: <git url> <commit>
 custom_nodes/       our own nodes (example: Output Name From Image)
 workflows/          UI workflows, seeded into ComfyUI's Workflows sidebar
 api/                API-format workflows for tools/comfy.py (smoke.json needs no model)
+examples/           ready model lists, pinned nodes and workflows per model family
 app/                optional second web app next to ComfyUI (see app/README.md)
 Dockerfile build.sh start.sh run-local.sh
-tools/              pod.py gpus.py comfy.py hf-sha256.py fill-volume.py rp.py
+tools/              pod.py gpus.py comfy.py hf-sha256.py template-models.py new-project.sh
+                    fill-volume.py rp.py
                     volume-job.sh populate-volume.sh fetch-models.sh
 ```
 
 ## Starting a new project
 
+From an example ([examples/](examples/README.md): FLUX.1, Qwen-Image, Krea 2,
+Marigold, LTX-2.3, Wan 2.2, Wan 2.2 Animate, MiniMax H3), which brings its
+models, pinned nodes, workflows and settings:
+
 ```bash
-cp -r comfyui-runpod my-tool && cd my-tool && git init
+tools/new-project.sh --list
+tools/new-project.sh qwen-image ../my-qwen && cd ../my-qwen && git init
+```
+
+Or from scratch:
+
+```bash
+tools/new-project.sh --empty ../my-tool && cd ../my-tool && git init
 $EDITOR project.conf                       # PROJECT, IMAGE, POD_NAME, VOLUME_NAME, AUTH_FILE, ...
 (umask 077; mkdir -p ~/.api/runpod; echo 'me:a-long-password' > ~/.api/runpod/my-tool.auth)
 $EDITOR models.txt && tools/hf-sha256.py --write
@@ -66,6 +83,7 @@ custom nodes (`custom_nodes.txt`). DESIGN.md section 12 is the full checklist.
 ./run-local.sh                        # or --cpu without a GPU
 tools/comfy.py status
 tools/comfy.py run api/smoke.json --set 1.image=@some.png --out results/
+tools/comfy.py check workflows/*.json   # every node type installed?
 ./run-local.sh stop
 ```
 
@@ -118,6 +136,8 @@ Tested 2026-10-24 on the local machine:
 - With `POD_AUTH` set: 401 without the password or with a wrong one, 200 with
   it, websockets pass, and the password is not visible in the process list.
 - The read-only API calls (`gpus.py`, `pod.py status` and `volumes`) work.
+- `examples/`: every workflow's node types exist in the baseline's ComfyUI; the
+  wan2.2-animate image builds with its three node packs (examples/README.md).
 - On RunPod, `fill-volume.py` filled a test volume from the `models.txt` URLs
   and from R2 (CPU pods), checked the SHA-256s, reported a wrong checksum as a
   failure (exit 1), and deleted the pod each time.

@@ -3,6 +3,7 @@
 what it saved.
 
     comfy.py status
+    comfy.py check workflows/*.json     every node type the workflows use is installed
     comfy.py run api/smoke.json --set 1.image=@photo.jpg --out ./results
     comfy.py run wf.json --set 5.seed=42 --set 6.text="a red door" --pod
 
@@ -165,10 +166,33 @@ def run(comfy, args):
         print("  (no output files: does the workflow have a Save node?)")
 
 
+FRONTEND_ONLY = {"Note", "MarkdownNote", "Reroute", "PrimitiveNode", "Label (rgthree)", "Fast Groups Bypasser (rgthree)",
+                 "Fast Groups Muter (rgthree)"}
+
+
+def check(comfy, files):
+    """Node types used by UI- or API-format workflows that this ComfyUI doesn't know."""
+    known = set(comfy.json("/object_info", timeout=120))
+    bad = 0
+    for f in files:
+        wf = json.loads(Path(f).read_text())
+        if "nodes" in wf:
+            subgraphs = (wf.get("definitions") or {}).get("subgraphs") or []
+            ids = {sg.get("id") for sg in subgraphs}
+            nodes = list(wf["nodes"]) + [n for sg in subgraphs for n in sg.get("nodes") or []]
+            types = {n.get("type") for n in nodes} - ids - FRONTEND_ONLY - {None}
+        else:
+            types = {n.get("class_type") for n in wf.values() if isinstance(n, dict)} - {None}
+        missing = sorted(types - known)
+        bad += bool(missing)
+        print(f"  {'MISSING ' + ', '.join(missing) if missing else 'ok'}: {f} ({len(types)} node types)")
+    return bad
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("command", choices=["status", "run"])
-    ap.add_argument("workflow", nargs="?", help="API-format workflow JSON (run)")
+    ap.add_argument("command", choices=["status", "run", "check"])
+    ap.add_argument("workflow", nargs="*", help="API-format workflow JSON (run); workflow files (check)")
     ap.add_argument("--set", action="append", default=[], metavar="NODE.INPUT=VALUE")
     ap.add_argument("--out", default="results", help="download folder (default ./results)")
     ap.add_argument("--timeout", type=int, default=0, help="give up waiting after N s (default: wait)")
@@ -186,9 +210,14 @@ def main():
                   f"pytorch {s['system'].get('pytorch_version')}")
             for d in s.get("devices", []):
                 print(f"  {d['name']}: {d['vram_free'] / 2**30:.1f} of {d['vram_total'] / 2**30:.1f} GiB free")
-        else:
+        elif args.command == "check":
             if not args.workflow:
-                ap.error("run needs a workflow")
+                ap.error("check needs workflow files")
+            sys.exit(1 if check(comfy, args.workflow) else 0)
+        else:
+            if len(args.workflow) != 1:
+                ap.error("run needs one workflow")
+            args.workflow = args.workflow[0]
             run(comfy, args)
     except RuntimeError as e:
         sys.exit(f"ERROR: {e}")

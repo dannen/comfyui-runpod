@@ -62,10 +62,16 @@ RUN python3 -m venv /opt/awscli \
     && /opt/awscli/bin/pip install --no-input --prefer-binary awscli \
     && /opt/awscli/bin/aws --version
 
+# System libraries that many node packs need: OpenCV (cv2) won't import without
+# libxcb/libGL, and the CUDA runtime base image has neither.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libgl1 libglib2.0-0 libxcb1 libsm6 libxext6 libxrender1 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Third-party custom nodes, each pinned to a commit or tag (custom_nodes.txt).
 COPY custom_nodes.txt /opt/custom_nodes.txt
 RUN set -e; \
-    grep -vE '^\s*(#|$)' /opt/custom_nodes.txt | while read -r url ref; do \
+    grep -vE '^\s*(#|$)' /opt/custom_nodes.txt | while read -r url ref _; do \
         name=$(basename "$url" .git); dir="custom_nodes/$name"; \
         echo "== $name @ $ref"; \
         git init -q "$dir"; git -C "$dir" remote add origin "$url"; \
@@ -83,7 +89,9 @@ COPY custom_nodes/ /opt/ComfyUI/custom_nodes/
 # --cpu: no GPU at build time. The torch check catches a requirement that swapped it anyway.
 RUN ./venv/bin/python main.py --cpu --quick-test-for-ci > /tmp/quick-test.log 2>&1 \
     || { cat /tmp/quick-test.log; exit 1; }; \
-    if grep -q "IMPORT FAILED" /tmp/quick-test.log; then grep -B5 "IMPORT FAILED" /tmp/quick-test.log; exit 1; fi; \
+    if grep -q "IMPORT FAILED" /tmp/quick-test.log; then \
+        grep -A15 -E "Traceback|Cannot import" /tmp/quick-test.log | head -200; grep "IMPORT FAILED" /tmp/quick-test.log; exit 1; \
+    fi; \
     ./venv/bin/python -c "import torch; assert '${CUDA_TAG}' in torch.__version__, torch.__version__"; \
     rm -rf user output input temp
 

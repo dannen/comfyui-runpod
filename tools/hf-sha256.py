@@ -13,6 +13,7 @@ import argparse
 import os
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 
 import rp
@@ -31,12 +32,20 @@ def head(url):
     headers = {"User-Agent": rp.user_agent()}
     if os.environ.get("HF_TOKEN"):
         headers["Authorization"] = f"Bearer {os.environ['HF_TOKEN']}"
-    req = urllib.request.Request(url, method="HEAD", headers=headers)
-    try:
-        r = urllib.request.build_opener(NoRedirect).open(req, timeout=30)
-    except urllib.error.HTTPError as e:   # the 302 lands here
-        r = e
-    sha = (r.headers.get("X-Linked-Etag") or r.headers.get("ETag") or "").strip('"').removeprefix("W/").strip('"')
+    for _ in range(5):
+        req = urllib.request.Request(url, method="HEAD", headers=headers)
+        try:
+            r = urllib.request.build_opener(NoRedirect).open(req, timeout=30)
+        except urllib.error.HTTPError as e:   # the redirects land here
+            r = e
+        # A renamed repo answers with a relative redirect to its new name first; the
+        # redirect to the file's storage (the one with X-Linked-Etag) comes after it.
+        loc = r.headers.get("Location", "")
+        if r.status in (301, 302, 307, 308) and not r.headers.get("X-Linked-Etag") and loc.startswith("/"):
+            url = urllib.parse.urljoin(url, loc)
+            continue
+        break
+    sha =(r.headers.get("X-Linked-Etag") or r.headers.get("ETag") or "").strip('"').removeprefix("W/").strip('"')
     size = r.headers.get("X-Linked-Size") or r.headers.get("Content-Length")
     return r.status, sha if len(sha) == 64 else "", int(size) if size else 0
 
