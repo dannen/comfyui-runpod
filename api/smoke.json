@@ -1,0 +1,18 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": {"image": "example.png"}
+  },
+  "2": {
+    "class_type": "ImageInvert",
+    "inputs": {"image": ["1", 0]}
+  },
+  "3": {
+    "class_type": "OutputNameFromImage",
+    "inputs": {"image": ["1", 0], "suffix": "inverted", "folder": "smoke"}
+  },
+  "4": {
+    "class_type": "SaveImage",
+    "inputs": {"images": ["2", 0], "filename_prefix": ["3", 0]}
+  }
+}

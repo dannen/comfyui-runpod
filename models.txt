@@ -1,0 +1,16 @@
+# Model manifest: the only list of models. start.sh (at boot), populate-volume.sh
+# (from your machine) and tools/hf-sha256.py read it.
+#
+# Format: <models/ subdir> <url> [sha256]
+#   - the file name is the URL's basename (query string dropped)
+#   - sha256 is checked after every download, whatever the source. For Hugging
+#     Face files, tools/hf-sha256.py fills it in from HF's X-Linked-Etag.
+#   - note each file's size and what needs it in a comment: it sizes the volume.
+#
+# Example (4.9MB): TAESD decoder for live previews. Replace with your project's models.
+vae_approx https://huggingface.co/madebyollin/taesd/resolve/main/taesd_decoder.safetensors f0fb51dd10d41c26612c070fa0b52ea0215a5ff90792134b4971109dd713c019
+
+# diffusion_models https://huggingface.co/<org>/<repo>/resolve/main/<file>.safetensors
+# loras            https://huggingface.co/<org>/<repo>/resolve/main/<file>.safetensors
+# vae              https://huggingface.co/<org>/<repo>/resolve/main/<file>.safetensors
+# text_encoders    https://huggingface.co/<org>/<repo>/resolve/main/<file>.safetensors

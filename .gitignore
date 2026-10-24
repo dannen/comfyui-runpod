@@ -1,0 +1,11 @@
+# Machine-specific settings and anything secret
+project.local.conf
+*.key
+*.auth
+*.env
+s3-credentials
+# Model files (models.txt is the list; populate-volume.sh downloads here)
+models/
+results/
+__pycache__/
+*.pyc

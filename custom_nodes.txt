@@ -1,0 +1,11 @@
+# Third-party custom nodes baked into the image: <git url> <full commit sha or tag>
+#
+# - Pin every pack. "Latest" in a cached build layer silently freezes an old
+#   version, and an uncached one can pick up a broken release.
+# - Prefer GitHub URLs over the Comfy Registry (registry entries have failed to
+#   install, or lagged behind, for some packs).
+# - Each pack's requirements.txt is installed with torch held in place
+#   (/opt/constraints.txt); the build fails if any pack doesn't import.
+# - Read a pack before adding it: it runs with the pod's credentials and files.
+#
+# https://github.com/rgthree/rgthree-comfy 449c58fcdd61...   (needs the full 40-character sha)
