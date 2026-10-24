@@ -16,7 +16,8 @@ What you get:
 - **Tools** (`tools/`, Python standard library only):
   - `pod.py`: create / update / recreate / stop / start / delete the pod, volumes; tries
     datacenter x GPU lists in order; never drops the password on an update.
-  - `gpus.py`: GPU stock by datacenter, ranked by price per GB of VRAM.
+  - `gpus.py`: GPU stock by datacenter, ranked by price per GB of VRAM; `--cheapest` for the
+    cheapest in-stock GPUs anywhere (secure, community and spot prices).
   - `comfy.py`: run an API-format workflow on the pod or locally, upload inputs,
     download results without overwriting.
   - `hf-sha256.py`: fill `models.txt`'s SHA-256 column from Hugging Face.
