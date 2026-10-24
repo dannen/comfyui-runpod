@@ -76,8 +76,8 @@ until they're deleted.
 4. Build and test locally: `./build.sh --cu128 --cache`, then `./run-local.sh`
    (or `--cpu`), then `tools/comfy.py run`. Measure VRAM and time at real sizes.
    That decides which GPU to rent.
-5. `tools/gpus.py`. Create a volume in each chosen datacenter and fill it
-   (`DESIGN.md` section 4 ranks the ways).
+5. `tools/gpus.py`. Create a volume in each chosen datacenter and fill it,
+   usually with `tools/fill-volume.py` (`DESIGN.md` section 4 ranks the ways).
 6. Commit, then `./build.sh --push` (it needs a clean tree), then
    `tools/pod.py create`.
 7. **Verify** before saying it works:

@@ -117,8 +117,8 @@ boot (a cold volume reads at ~90 MiB/s); `VERIFY_MODELS=true` does it.
 
 ### Filling a volume, best first
 
-1. **From R2 by a pod in the volume's datacenter** (`MODELS_SOURCE=r2`, or a
-   throwaway pod running `tools/fetch-models.sh /workspace/models`). Writes the
+1. **By a throwaway pod in the volume's datacenter** (`tools/fill-volume.py`),
+   from the `models.txt` URLs or from R2 (`--source r2`). Writes the
    volume directly; ~25GB in 2 min in the best case. R2 has no download fees and
    one bucket serves every region. Pods get a **read-only, bucket-scoped** token.
 2. **From Hugging Face at boot** (the default). Fast from some datacenters (~3 min

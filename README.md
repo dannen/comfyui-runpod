@@ -20,7 +20,9 @@ What you get:
   - `comfy.py`: run an API-format workflow on the pod or locally, upload inputs,
     download results without overwriting.
   - `hf-sha256.py`: fill `models.txt`'s SHA-256 column from Hugging Face.
-  - `populate-volume.sh`: seed a volume from your machine through the S3 gateway.
+  - `fill-volume.py`: fill a volume from inside its datacenter with a throwaway pod (from the
+    `models.txt` URLs or R2), check the SHA-256s, delete the pod.
+  - `populate-volume.sh`: seed a volume from your machine through the S3 gateway (small files).
   - `fetch-models.sh`: copy models from a Cloudflare R2 bucket (also used at boot).
 - **Local runs** (`run-local.sh`): the image on your GPU, folders mounted, no password.
 
@@ -40,7 +42,8 @@ workflows/          UI workflows, seeded into ComfyUI's Workflows sidebar
 api/                API-format workflows for tools/comfy.py (smoke.json needs no model)
 app/                optional second web app next to ComfyUI (see app/README.md)
 Dockerfile build.sh start.sh run-local.sh
-tools/              pod.py gpus.py comfy.py hf-sha256.py rp.py populate-volume.sh fetch-models.sh
+tools/              pod.py gpus.py comfy.py hf-sha256.py fill-volume.py rp.py
+                    volume-job.sh populate-volume.sh fetch-models.sh
 ```
 
 ## Starting a new project
@@ -79,6 +82,7 @@ in `project.conf` first.
 ```bash
 tools/gpus.py --vram 24                         # who has stock, where
 tools/pod.py create-volume US-KS-2              # VOLUME_NAME-ks, VOLUME_GB
+tools/fill-volume.py US-KS-2                    # models.txt -> that volume, by a throwaway pod
 tools/pod.py create --image IMAGE:<sha>-cu128   # tries DATACENTERS x GPU_TYPES
 tools/pod.py status                             # URLs; open ComfyUI, log in with AUTH_FILE's user:password
 tools/comfy.py run api/smoke.json --pod --set 1.image=@some.png
@@ -86,7 +90,8 @@ tools/pod.py update --image IMAGE:<new sha>-cu128
 tools/pod.py stop                               # or: delete --yes (network volumes stay)
 ```
 
-Models arrive on first boot from their `models.txt` URLs. Other sources, via
+Filling the volume first (above) makes the pod's first boot quick. Otherwise
+models arrive on first boot from their `models.txt` URLs. Other sources, via
 `--env` on `create`/`update`:
 
 - `MODELS_SOURCE=r2` plus read-only `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`,
@@ -112,6 +117,9 @@ Tested 2026-10-24 on the local machine:
 - With `POD_AUTH` set: 401 without the password or with a wrong one, 200 with
   it, websockets pass, and the password is not visible in the process list.
 - The read-only API calls (`gpus.py`, `pod.py status` and `volumes`) work.
+- On RunPod, `fill-volume.py` filled a test volume from the `models.txt` URLs
+  and from R2 (CPU pods), checked the SHA-256s, reported a wrong checksum as a
+  failure (exit 1), and deleted the pod each time.
 
 Not tested yet in this baseline:
 
@@ -119,6 +127,7 @@ Not tested yet in this baseline:
   over from earlier projects, where it ran.
 - The cu130 build.
 - `MODELS_SOURCE=r2` and `s3:` at boot. `fetch-models.sh` itself is proven.
+- `fill-volume.py --push`.
 - `populate-volume.sh` with the SHA-256 column.
 
 Serverless isn't included; DESIGN.md section 10 has the notes for it.
