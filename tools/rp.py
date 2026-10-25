@@ -131,6 +131,33 @@ def proxy_url(pod_id, port=8188):
     return f"https://{pod_id}-{port}.proxy.runpod.net"
 
 
+R2_KEYS = ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET")
+
+
+def r2_env(write=False):
+    """R2_* settings for a pod or fetch-models.sh: the read-only key file (R2_ENV_FILE_RO), or
+    the read-write one (R2_ENV_FILE) with write=True, plus R2_PREFIX from project.conf."""
+    setting = "R2_ENV_FILE" if write else "R2_ENV_FILE_RO"
+    path = conf(setting)
+    if not path:
+        sys.exit(f"ERROR: set {setting} in project.conf")
+    env = {}
+    try:
+        lines = Path(path).expanduser().read_text().splitlines()
+    except OSError as e:
+        sys.exit(f"ERROR: {setting}: {e}")
+    for line in lines:
+        k, sep, v = line.strip().partition("=")
+        if sep and not k.startswith("#"):
+            env[k.removeprefix("export ").strip()] = v.strip().strip("'\"")
+    missing = [k for k in R2_KEYS if not env.get(k)]
+    if missing:
+        sys.exit(f"ERROR: {path}: missing {', '.join(missing)}")
+    out = {k: env[k] for k in R2_KEYS}
+    out["R2_PREFIX"] = conf("R2_PREFIX") or env.get("R2_PREFIX") or "models"
+    return out
+
+
 # ---------------------------------------------------------------- RunPod API
 
 class ApiError(RuntimeError):

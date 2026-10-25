@@ -105,6 +105,7 @@ subdirs=(); urls=(); files=(); sizes=(); shas=()
 total_pending=0
 while read -r -u 3 subdir url sha _; do
     [[ -z "$subdir" || "$subdir" == \#* ]] && continue
+    [[ "$url" == r2:* ]] && { echo "SKIP (only in R2: tools/fill-volume.py --source r2): $subdir/${url#r2:}"; continue; }
     file="$(basename "${url%%\?*}")"
     key="models/$subdir/$file"
     # Multipart objects only appear once CompleteMultipartUpload succeeds,

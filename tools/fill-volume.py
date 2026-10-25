@@ -18,9 +18,8 @@ failure, timeout or Ctrl-C. Every file with a SHA-256 in models.txt is checked
 on the volume (or, with --sha256 FILE, the files in that sha256sum-style list,
 paths relative to models/). Exit status 0 = the job succeeded.
 
-R2 credentials: R2_ENV_FILE_RO (fetch, read-only token) and R2_ENV_FILE (push,
-read-write) from project.conf, files of R2_ACCOUNT_ID=, R2_ACCESS_KEY_ID=,
-R2_SECRET_ACCESS_KEY=, R2_BUCKET= (and optionally R2_PREFIX=) lines. The pod gets
+R2: the project's prefix (R2_PREFIX in project.conf), with the key files
+R2_ENV_FILE_RO (fetch, read-only token) and R2_ENV_FILE (push, read-write). The pod gets
 them as env vars, which is one more reason it is deleted at the end. HF_TOKEN
 from your environment is passed on for gated models (--source urls).
 """
@@ -40,29 +39,18 @@ HERE = Path(__file__).resolve().parent
 CPUS = "cpu3c-4-8,cpu5c-4-8,cpu3g-4-16,cpu5g-4-16,cpu3c-2-4,cpu3g-2-8,cpu5c-2-4,cpu3c-8-16"
 GPUS = ("NVIDIA RTX A4000,NVIDIA RTX A4500,NVIDIA RTX 2000 Ada Generation,NVIDIA RTX 4000 Ada Generation,"
         "NVIDIA RTX A5000,NVIDIA GeForce RTX 3090,NVIDIA L4,NVIDIA GeForce RTX 4090,NVIDIA RTX A6000,NVIDIA L40S")
-R2_KEYS = ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET")
 
 
-def read_r2_env(path):
-    env = {}
-    for line in Path(path).expanduser().read_text().splitlines():
-        k, sep, v = line.strip().partition("=")
-        if sep and not k.startswith("#"):
-            env[k.removeprefix("export ").strip()] = v.strip().strip("'\"")
-    missing = [k for k in R2_KEYS if not env.get(k)]
-    if missing:
-        sys.exit(f"ERROR: {path}: missing {', '.join(missing)}")
-    return {k: env[k] for k in (*R2_KEYS, "R2_PREFIX") if env.get(k)}
-
-
-def manifest_and_sums(path):
-    """models.txt as is, and a sha256sum -c list (paths relative to models/) of its SHA-256s."""
+def manifest_and_sums(path, skip_r2=False):
+    """models.txt as is, and a sha256sum -c list (paths relative to models/) of its SHA-256s.
+    skip_r2: leave out r2: entries (a URL fill can't bring them)."""
     text = Path(path).read_text()
     sums = []
     for line in text.splitlines():
         parts = line.split()
-        if len(parts) >= 3 and not line.lstrip().startswith("#"):
-            sums.append(f"{parts[2]}  {parts[0]}/{parts[1].split('?')[0].rsplit('/', 1)[-1]}")
+        if len(parts) >= 3 and not line.lstrip().startswith("#") and not (skip_r2 and parts[1].startswith("r2:")):
+            name = parts[1].removeprefix("r2:").split("?")[0].rsplit("/", 1)[-1]
+            sums.append(f"{parts[2]}  {parts[0]}/{name}")
     return text, "".join(s + "\n" for s in sums)
 
 
@@ -160,15 +148,13 @@ def main():
 
     env = {"JOB": job}
     if job in ("r2", "push"):
-        creds = rp.conf("R2_ENV_FILE" if job == "push" else "R2_ENV_FILE_RO")
-        if not creds:
-            sys.exit("ERROR: set R2_ENV_FILE_RO / R2_ENV_FILE in project.conf")
-        env.update(read_r2_env(creds))
+        env.update(rp.r2_env(write=job == "push"))
+        print(f"R2: {env['R2_BUCKET']}/{env['R2_PREFIX']}")
     if job == "urls" and os.environ.get("HF_TOKEN"):
         env["HF_TOKEN"] = os.environ["HF_TOKEN"]
     if a.flags:
         env["FETCH_FLAGS"] = a.flags
-    manifest, sums = manifest_and_sums(a.manifest)
+    manifest, sums = manifest_and_sums(a.manifest, skip_r2=job == "urls")
     if a.sha256:
         sums = Path(a.sha256).read_text()
     script = build_script(manifest, sums)

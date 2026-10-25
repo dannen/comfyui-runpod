@@ -110,11 +110,31 @@ tools/pod.py stop                               # or: delete --yes (network volu
 ```
 
 Filling the volume first (above) makes the pod's first boot quick. Otherwise
-models arrive on first boot from their `models.txt` URLs. Other sources, via
-`--env` on `create`/`update`:
+models arrive on first boot, from `MODELS_SOURCE` in `project.conf`:
 
-- `MODELS_SOURCE=r2` plus read-only `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`,
-  `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` (and `R2_PREFIX`, default `models`).
+- `url` (default): each `models.txt` URL.
+- `r2`: the project's prefix in your R2 bucket (`R2_PREFIX`), then URLs for
+  anything not there. `pod.py` puts the read-only key and the prefix into the
+  pod env. In one test R2 was 1.6x faster than Hugging Face (DESIGN.md section 4).
+
+### Models in Cloudflare R2
+
+One bucket for all projects, one prefix per project (`R2_PREFIX`, e.g.
+`qwen-image/models`), laid out like `models/`:
+
+```bash
+tools/r2.sh push ./models      # upload (read-write key); prints models.txt lines for new files
+tools/r2.sh list               # what's under the prefix
+tools/fill-volume.py US-KS-2 --source r2   # R2 -> a volume, by a pod in its datacenter
+```
+
+Files that exist only in R2 (your LoRAs, Civitai downloads) go into `models.txt`
+as `<subdir> r2:<name> <sha256>`: they're fetched only from R2 and checked like
+every other file. Public models can stay on Hugging Face URLs, or be pushed to
+R2 too, for speed.
+
+Other options, via `--env` on `create`/`update`:
+
 - `MODELS_SOURCE=s3:<DC>:<volume id>` plus `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`:
   copy from another seeded volume. That key opens every volume; update the pod
   without it afterwards.
@@ -141,13 +161,18 @@ Tested 2026-10-24 on the local machine:
 - On RunPod, `fill-volume.py` filled a test volume from the `models.txt` URLs
   and from R2 (CPU pods), checked the SHA-256s, reported a wrong checksum as a
   failure (exit 1), and deleted the pod each time.
+- R2 (2026-10-24): `tools/r2.sh push`/`list` with a per-project prefix; a CPU boot
+  with `MODELS_SOURCE=r2` fetched an `r2:` entry from the prefix (checksum OK)
+  and the rest from its URL; without R2 the `r2:` entry is reported, not
+  downloaded; `pod.py` builds the R2 env. Fill-speed test, R2 vs Hugging Face:
+  DESIGN.md section 4.
 
 Not tested yet in this baseline:
 
 - `pod.py create`, `update` and the other billable calls. Their code is carried
   over from earlier projects, where it ran.
 - The cu130 build.
-- `MODELS_SOURCE=r2` and `s3:` at boot. `fetch-models.sh` itself is proven.
+- `MODELS_SOURCE=s3:` at boot.
 - `fill-volume.py --push`.
 - `populate-volume.sh` with the SHA-256 column.
 

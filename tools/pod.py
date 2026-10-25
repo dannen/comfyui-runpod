@@ -58,6 +58,11 @@ def ports():
 
 def pod_env(args):
     env = {"PROJECT": rp.conf("PROJECT")}
+    source = rp.conf("MODELS_SOURCE", "url")
+    if source != "url":
+        env["MODELS_SOURCE"] = source
+    if source == "r2":   # the read-only key: it sits in the pod env
+        env.update(rp.r2_env())
     if not args.no_auth:
         auth = rp.pod_auth()
         if not auth:

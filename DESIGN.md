@@ -124,13 +124,28 @@ boot (a cold volume reads at ~90 MiB/s); `VERIFY_MODELS=true` does it.
 ### Filling a volume, best first
 
 1. **By a throwaway pod in the volume's datacenter** (`tools/fill-volume.py`),
-   from the `models.txt` URLs or from R2 (`--source r2`). Writes the
-   volume directly; ~25GB in 2 min in the best case. R2 has no download fees and
-   one bucket serves every region. Pods get a **read-only, bucket-scoped** token.
-2. **From Hugging Face at boot** (the default). Fast from some datacenters (~3 min
-   for 26GB), and it has been well under 1 MB/s from others. Public models are
-   usually fastest this way; put in R2 what HF doesn't have (your LoRAs, Civitai
-   files) or when HF is slow.
+   from R2 (`--source r2`) or from the `models.txt` URLs. It writes the volume
+   directly. R2 has no download fees, and one bucket serves every region (one
+   prefix per project, `R2_PREFIX`). Pods get a **read-only, bucket-scoped** token.
+2. **At boot** (`MODELS_SOURCE=r2` or `url` in `project.conf`), the same two
+   sources, while the pod waits.
+
+**R2 or Hugging Face?** The same 26.4GB set (10 files, one of them 20.5GB) on
+the same CPU pod type (cpu3c-4-8) in the same datacenter (US-NE-1), 2026-10-24:
+
+| Source | Fill time | Speed |
+|---|---|---|
+| R2 (`fetch-models.sh`, 16 parallel streams) | 173 s | up to 245 MiB/s; the last ~50 s crawl on a few slow streams |
+| Hugging Face (`curl`, one file at a time) | ~275 s | ~95 MB/s |
+
+R2 was about 1.6x faster, and it is the more predictable source: Hugging Face
+has also been seen at well under 1 MB/s from some datacenters (a ~20GB model
+then takes hours). Hugging Face costs nothing to set up and needs no upload.
+So: Hugging Face is fine to start with. Put a project's models in R2 (`tools/r2.sh
+push`, then `MODELS_SOURCE=r2`) once you fill volumes or boot pods often, when
+Hugging Face is slow from your datacenters, and always for files Hugging Face
+doesn't have (your LoRAs, Civitai downloads: `r2:` entries in `models.txt`).
+One measurement each; repeat it in your datacenters before relying on it.
 3. **Server-side `copy-object` between two volumes in the same datacenter.** No
    pod, ~110 MB/s. Cloudflare answers 524 after ~2 min on a 20GB object but the
    copy finishes anyway: poll the listing for the full size.

@@ -6,6 +6,8 @@
 #   - sha256 is checked after every download, whatever the source. For Hugging
 #     Face files, tools/hf-sha256.py fills it in from HF's X-Linked-Etag.
 #   - note each file's size and what needs it in a comment: it sizes the volume.
+#   - "r2:<name>" instead of a URL: a file only in your R2 bucket, under
+#     <R2_PREFIX>/<subdir>/<name> (tools/r2.sh push prints these lines).
 #
 # Example (4.9MB): TAESD decoder for live previews. Replace with your project's models.
 vae_approx https://huggingface.co/madebyollin/taesd/resolve/main/taesd_decoder.safetensors f0fb51dd10d41c26612c070fa0b52ea0215a5ff90792134b4971109dd713c019

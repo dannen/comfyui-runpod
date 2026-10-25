@@ -28,6 +28,7 @@ from_urls() {
   local fail=0 subdir url name hdr
   while read -r subdir url _; do
     [[ -z "$subdir" || "$subdir" == \#* ]] && continue
+    [[ "$url" == r2:* ]] && { echo "  $subdir/${url#r2:}: only in R2, skipped (--source r2)"; continue; }
     name=$(basename "${url%%\?*}")
     [[ -f "$subdir/$name" ]] && { echo "  $subdir/$name: present"; continue; }
     mkdir -p "$subdir"; hdr=()

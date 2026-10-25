@@ -14,8 +14,9 @@
 #
 # Environment:
 #   POD_AUTH             user:password. Unset: open, with a warning. "off": open, no warning (local).
-#   MODELS_SOURCE        url (default: each models.txt URL) | r2 (fetch-models.sh with R2_*
-#                        read-only creds, then URLs for anything left) | s3:<DC>:<volume id>
+#   MODELS_SOURCE        url (default: each models.txt URL) | r2 (fetch-models.sh copies the
+#                        project's R2 prefix, R2_PREFIX, with R2_* read-only creds; then URLs
+#                        for anything left; tools/pod.py sets all of it) | s3:<DC>:<volume id>
 #                        (another volume's S3 gateway; needs AWS_ACCESS_KEY_ID/SECRET, which
 #                        open every volume: remove them from the pod afterwards)
 #   SKIP_MODEL_DOWNLOAD  true: don't look at models.txt at all
@@ -59,8 +60,10 @@ done
 
 # ---- 4. models
 # models.txt: <models/ subdir> <url> [sha256]. The file name is the URL's basename (no query).
+# "r2:<name>" instead of a URL: a file that exists only in the project's R2 prefix
+# (<R2_PREFIX>/<subdir>/<name>), so it can only come from MODELS_SOURCE=r2.
 manifest_entries() { grep -vE '^\s*(#|$)' "$COMFY_ROOT/models.txt" || true; }
-target_of() { local u="${2%%\?*}"; echo "$VOLUME_ROOT/models/$1/$(basename "$u")"; }
+target_of() { local u="${2#r2:}"; u="${u%%\?*}"; echo "$VOLUME_ROOT/models/$1/$(basename "$u")"; }
 
 fetch_url() {   # url dest
   local hdr=()
@@ -111,7 +114,14 @@ else
     mkdir -p "$(dirname "$t")"
     if [[ ! -f "$t" ]]; then
       # .partial + mv: a killed transfer never passes for a complete file.
-      if [[ "${MODELS_SOURCE:-url}" == s3:* ]] && fetch_s3 "models/$subdir/$name" "$t.partial"; then
+      if [[ "$url" == r2:* ]]; then
+        if [[ "${MODELS_SOURCE:-url}" == r2 ]]; then
+          echo "[boot] ERROR: $subdir/$name: not in R2 under ${R2_PREFIX:-models}/$subdir/ (tools/r2.sh push)" >&2
+        else
+          echo "[boot] ERROR: $subdir/$name: only in R2; set MODELS_SOURCE=r2 in project.conf and update the pod" >&2
+        fi
+        model_errors=$((model_errors + 1)); continue
+      elif [[ "${MODELS_SOURCE:-url}" == s3:* ]] && fetch_s3 "models/$subdir/$name" "$t.partial"; then
         log "  $name: from ${MODELS_SOURCE#s3:}"
       else
         log "  $name: downloading"

@@ -63,6 +63,9 @@ def main():
         if not parts or line.lstrip().startswith("#") or len(parts) < 2:
             continue
         subdir, url, have = parts[0], parts[1], parts[2] if len(parts) > 2 else ""
+        if url.startswith("r2:"):
+            print(f"  {'r2':>8}  {subdir}/{url[3:]}  {have or '(no SHA-256: tools/r2.sh push prints it)'}")
+            continue
         if "huggingface.co/" not in url:
             print(f"  {'?':>8}  {subdir}/{url.rsplit('/', 1)[-1]}  (not Hugging Face: add its SHA-256 by hand)")
             continue
